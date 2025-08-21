@@ -8,7 +8,10 @@
       "Bash(mv:*)",
       "Bash(rustc --version)",
       "Bash(cp:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(cargo build:*)",
+      "Bash(chmod:*)",
+      "Bash(pkill:*)"
     ],
     "deny": [],
     "ask": [],

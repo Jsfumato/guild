@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use uuid::Uuid;
 
 use crate::config::Config;
 use crate::network::Network;
@@ -28,7 +27,31 @@ impl GuildHome {
         );
         tokio::spawn(discovery.start());
         
-        // 메인 루프 - 피어 상태 모니터링
+        // Ping 전송 루프 (5초마다)
+        let network_ping = self.network.clone();
+        tokio::spawn(async move {
+            let mut ping_interval = tokio::time::interval(
+                tokio::time::Duration::from_secs(5)
+            );
+            loop {
+                ping_interval.tick().await;
+                network_ping.send_ping().await;
+            }
+        });
+        
+        // 피어 헬스 체크 루프 (10초마다)
+        let network_health = self.network.clone();
+        tokio::spawn(async move {
+            let mut health_interval = tokio::time::interval(
+                tokio::time::Duration::from_secs(10)
+            );
+            loop {
+                health_interval.tick().await;
+                network_health.check_peer_health().await;
+            }
+        });
+        
+        // 메인 모니터링 루프
         let mut interval = tokio::time::interval(
             tokio::time::Duration::from_secs(self.config.heartbeat_interval)
         );
@@ -43,12 +66,6 @@ impl GuildHome {
                     peers, 
                     self.network.local_port()
                 );
-            }
-            
-            // 연결된 피어들과 하트비트 메시지 교환
-            if peers > 0 {
-                let heartbeat_msg = format!("heartbeat-{}", Uuid::new_v4());
-                self.network.broadcast(heartbeat_msg.as_bytes()).await;
             }
         }
     }

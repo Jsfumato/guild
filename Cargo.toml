@@ -8,6 +8,7 @@ members = [
 # P2P 네트워킹용 의존성
 tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "macros", "sync"] }
 serde = { version = "1", features = ["derive"] }
+bincode = "1"
 quinn = "0.10"
 rustls = { version = "0.21", features = ["dangerous_configuration"] }
 rcgen = "0.11"

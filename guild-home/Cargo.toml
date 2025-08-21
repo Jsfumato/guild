@@ -10,6 +10,7 @@ license = "MIT"
 # P2P 네트워킹용 의존성
 tokio = { workspace = true }
 serde = { workspace = true }
+bincode = { workspace = true }
 quinn = { workspace = true }
 rustls = { workspace = true }
 rcgen = { workspace = true }
