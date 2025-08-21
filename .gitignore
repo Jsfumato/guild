@@ -6,6 +6,7 @@ Cargo.lock
 *.pdb
 
 # IDE and editor files
+/claude/
 .idea/
 *.iml
 *.ipr
