@@ -1,0 +1,26 @@
+[package]
+name = "guild-home"
+version = "0.1.0"
+edition = "2021"
+authors = ["Guild Home Contributors"]
+description = "P2P peer discovery and networking core"
+license = "MIT"
+
+[dependencies]
+# P2P 네트워킹용 의존성
+tokio = { workspace = true }
+serde = { workspace = true }
+quinn = { workspace = true }
+rustls = { workspace = true }
+rcgen = { workspace = true }
+mdns-sd = { workspace = true }
+uuid = { workspace = true }
+blake3 = "1.8.2"
+
+[lib]
+name = "guild_home"
+path = "src/lib.rs"
+
+[[bin]]
+name = "guild-home"
+path = "src/main.rs"

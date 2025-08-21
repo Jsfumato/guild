@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  # Core P2P node
+  guild-home:
+    build: .
+    command: guild-home --port 8000 --interval 5
+    ports:
+      - "8000:8000"
+    environment:
+      - GUILD_PORT=8000
+      - GUILD_HEARTBEAT_INTERVAL=5
+      - GUILD_LOG_LEVEL=info
+    networks:
+      - guild_network
+
+  # Additional nodes for testing P2P network
+  guild-node-2:
+    build: .
+    command: guild-home --port 8001 --bootstrap guild-home:8000 --interval 5
+    ports:
+      - "8001:8001"
+    environment:
+      - GUILD_PORT=8001
+      - GUILD_BOOTSTRAP=guild-home:8000
+      - GUILD_HEARTBEAT_INTERVAL=5
+    depends_on:
+      - guild-home
+    networks:
+      - guild_network
+
+  guild-node-3:
+    build: .
+    command: guild-home --port 8002 --bootstrap guild-home:8000,guild-node-2:8001 --interval 5
+    ports:
+      - "8002:8002"
+    environment:
+      - GUILD_PORT=8002
+      - GUILD_BOOTSTRAP=guild-home:8000,guild-node-2:8001
+      - GUILD_HEARTBEAT_INTERVAL=5
+    depends_on:
+      - guild-home
+      - guild-node-2
+    networks:
+      - guild_network
+
+networks:
+  guild_network:
+    driver: bridge

@@ -1,0 +1,28 @@
+[workspace]
+resolver = "2"
+members = [
+    "guild-home"
+]
+
+[workspace.dependencies]
+# P2P 네트워킹용 의존성
+tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "macros", "sync"] }
+serde = { version = "1", features = ["derive"] }
+quinn = "0.10"
+rustls = { version = "0.21", features = ["dangerous_configuration"] }
+rcgen = "0.11"
+mdns-sd = "0.10"
+uuid = { version = "1", features = ["v4"] }
+
+[workspace.metadata]
+authors = ["Guild Home Contributors"]
+description = "P2P peer discovery and networking system"
+license = "MIT"
+repository = "https://github.com/guild-home/guild-workspace"
+
+[profile.release]
+opt-level = "z"  # 크기 최적화
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
