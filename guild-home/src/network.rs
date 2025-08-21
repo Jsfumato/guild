@@ -184,7 +184,7 @@ impl Network {
             let ping_id = uuid::Uuid::new_v4().to_string();
             let ping_id_copy = ping_id.clone(); // 복사본 생성
             let addr_copy = *addr; // 복사
-            
+
             let msg = Message::Ping {
                 id: ping_id.clone(),
                 timestamp: std::time::SystemTime::now()
@@ -195,7 +195,7 @@ impl Network {
 
             let serialized = bincode::serialize(&msg).unwrap();
             let serialized_len = serialized.len(); // 길이 미리 저장
-            
+
             log_network!(
                 "📤 Sending Ping {} to {} ({} bytes)",
                 ping_id_copy,
@@ -207,7 +207,9 @@ impl Network {
                 Ok(mut send) => match send.write_all(&serialized).await {
                     Ok(_) => match send.finish().await {
                         Ok(_) => log_network!("✅ Ping {} sent to {}", ping_id, addr_copy),
-                        Err(e) => log_network!("❌ Failed to finish send to {}: {:?}", addr_copy, e),
+                        Err(e) => {
+                            log_network!("❌ Failed to finish send to {}: {:?}", addr_copy, e)
+                        }
                     },
                     Err(e) => log_network!("❌ Failed to write ping to {}: {:?}", addr_copy, e),
                 },
@@ -350,25 +352,22 @@ impl Network {
                         Err(e) => {
                             log_network!("⚠️ Failed to deserialize message from {}: {:?}", addr, e);
                             let buf_sample = buf[..buf.len().min(100)].to_vec();
-                            log_network!(
-                                "⚠️ Buffer content (first 100 bytes): {:?}",
-                                buf_sample
-                            );
+                            log_network!("⚠️ Buffer content (first 100 bytes): {:?}", buf_sample);
                         }
                     }
                 }
                 Err(e) => {
                     // 연결 상태 확인
                     let error_msg = e.to_string();
-                    if error_msg.contains("Closed") || error_msg.contains("closed") {
-                        log_network!("🔌 Connection closed: {} ({})", addr, error_msg);
-                        peers.write().await.remove(&addr);
-                        break;
-                    } else {
-                        // 일시적인 에러는 로그만 출력하고 계속 시도
-                        log_network!("⚠️ Stream error from {}: {} (retrying...)", addr, error_msg);
-                        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                    }
+                    // if error_msg.contains("Closed") || error_msg.contains("closed") {
+                    log_network!("🔌 Connection closed: {} ({})", addr, error_msg);
+                    peers.write().await.remove(&addr);
+                    break;
+                    // } else {
+                    // 일시적인 에러는 로그만 출력하고 계속 시도
+                    // log_network!("⚠️ Stream error from {}: {} (retrying...)", addr, error_msg);
+                    // tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                    // }
                 }
             }
         }
