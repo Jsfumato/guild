@@ -1,0 +1,15 @@
+[package]
+name = "guild-logger"
+version = "0.1.0"
+edition = "2021"
+authors = ["Guild Logger Contributors"]
+description = "Centralized logging system for Guild framework"
+license = "MIT"
+
+[dependencies]
+tokio = { workspace = true }
+chrono = "0.4"
+
+[lib]
+name = "guild_logger"
+path = "src/lib.rs"

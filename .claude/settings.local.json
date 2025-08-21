@@ -12,7 +12,8 @@
       "Bash(cargo build:*)",
       "Bash(chmod:*)",
       "Bash(pkill:*)",
-      "Bash(cargo:*)"
+      "Bash(cargo:*)",
+      "Bash(mkdir:*)"
     ],
     "deny": [],
     "ask": [],
