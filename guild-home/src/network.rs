@@ -359,15 +359,9 @@ impl Network {
                 Err(e) => {
                     // 연결 상태 확인
                     let error_msg = e.to_string();
-                    // if error_msg.contains("Closed") || error_msg.contains("closed") {
                     log_network!("🔌 Connection closed: {} ({})", addr, error_msg);
                     peers.write().await.remove(&addr);
                     break;
-                    // } else {
-                    // 일시적인 에러는 로그만 출력하고 계속 시도
-                    // log_network!("⚠️ Stream error from {}: {} (retrying...)", addr, error_msg);
-                    // tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                    // }
                 }
             }
         }

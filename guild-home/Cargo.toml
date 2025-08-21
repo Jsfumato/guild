@@ -17,7 +17,6 @@ quinn = { workspace = true }
 rustls = { workspace = true }
 rcgen = { workspace = true }
 uuid = { workspace = true }
-blake3 = "1.8.2"
 
 # TUI 의존성
 ratatui = "0.24"

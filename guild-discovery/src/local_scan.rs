@@ -7,14 +7,12 @@ pub const DEFAULT_PORT_RANGE: u16 = 100; // 42000-42100 범위
 
 pub struct LocalScanner {
     base_port: u16,
-    port_range: u16,
 }
 
 impl LocalScanner {
     pub fn new(current_port: u16) -> Self {
         Self {
             base_port: current_port,
-            port_range: DEFAULT_PORT_RANGE,
         }
     }
 
@@ -54,9 +52,7 @@ impl LocalScanner {
             }
         }
 
-        // if !discovered.is_empty() {
-        //     println!("🔍 Scanning {} potential local peers", discovered.len());
-        // }
+        // Return discovered peers
 
         discovered
     }

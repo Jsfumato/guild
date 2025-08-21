@@ -84,6 +84,7 @@ pub fn init_logger(tui_mode: bool) {
 }
 
 pub fn get_logger() -> &'static Logger {
+    #[allow(static_mut_refs)]
     unsafe {
         GLOBAL_LOGGER.as_ref().expect("Logger not initialized")
     }

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::config::Config;
 use crate::network::Network;
-use crate::{log_connection, log_network, log_success};
+use crate::log_network;
 use guild_discovery::{Discovery, DiscoveryConfig};
 
 pub struct GuildHome {
@@ -91,13 +91,11 @@ impl GuildHome {
         loop {
             interval.tick().await;
 
-            let peers = self.network.peer_count().await;
+            let _peers = self.network.peer_count().await;
 
+            // Log level check for future use
             if self.config.log_level != "error" {
-                // println!("⚡ Guild Home | Peers: {} | Port: {}",
-                //     peers,
-                //     self.network.local_port()
-                // );
+                // Future monitoring output can go here
             }
         }
     }

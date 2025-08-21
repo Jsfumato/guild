@@ -29,8 +29,8 @@ impl NodeId {
     
     pub fn distance(&self, other: &NodeId) -> Distance {
         let mut dist = [0u8; NODE_ID_LENGTH];
-        for i in 0..NODE_ID_LENGTH {
-            dist[i] = self.0[i] ^ other.0[i];
+        for (i, byte) in dist.iter_mut().enumerate().take(NODE_ID_LENGTH) {
+            *byte = self.0[i] ^ other.0[i];
         }
         Distance(dist)
     }
@@ -65,6 +65,12 @@ pub struct Node {
 pub struct KBucket {
     nodes: Vec<Node>,
     max_size: usize,
+}
+
+impl Default for KBucket {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl KBucket {
