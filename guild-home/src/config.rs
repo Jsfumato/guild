@@ -1,4 +1,5 @@
 use std::env;
+use guild_discovery::DEFAULT_PORT;
 
 #[derive(Debug)]
 pub enum ConfigError {
@@ -19,7 +20,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            port: 0,
+            port: DEFAULT_PORT,  // 기본값을 42000으로 설정
             bootstrap: vec![],
             data_dir: "./data".to_string(),
             heartbeat_interval: 5,
@@ -111,7 +112,7 @@ impl Config {
     }
 
     fn load_from_env(&mut self) -> Result<(), ConfigError> {
-        if self.port == 0 {
+        if self.port == DEFAULT_PORT {  // 기본값인 경우에만 환경변수 체크
             if let Ok(port_str) = env::var("GUILD_PORT") {
                 self.port = port_str.parse()
                     .map_err(|_| ConfigError::InvalidPort(format!("Invalid GUILD_PORT: {}", port_str)))?;

@@ -37,10 +37,34 @@ impl Network {
         let server_config = Self::make_server_config();
         let client_config = Self::make_client_config();
 
-        // 포트 설정 (0 = 자동 할당)
-        let addr = format!("0.0.0.0:{}", port);
-        let mut endpoint = Endpoint::server(server_config, addr.parse().unwrap()).unwrap();
+        let mut endpoint = None;
+        let mut current_port = port;
+        let max_attempts = 100; // 최대 100번 시도
+        
+        // Address already in use 에러 시 포트를 1씩 증가시키며 재시도
+        for attempt in 0..max_attempts {
+            let addr = format!("0.0.0.0:{}", current_port);
+            match Endpoint::server(server_config.clone(), addr.parse().unwrap()) {
+                Ok(ep) => {
+                    endpoint = Some(ep);
+                    if attempt > 0 {
+                        println!("✅ Found available port {} after {} attempts", current_port, attempt + 1);
+                    }
+                    break;
+                }
+                Err(e) => {
+                    let error_msg = e.to_string();
+                    if error_msg.contains("Address already in use") || error_msg.contains("already being used") {
+                        println!("⚠️ Port {} already in use, trying port {}", current_port, current_port + 1);
+                        current_port += 1;
+                    } else {
+                        panic!("Failed to create endpoint: {:?}", e);
+                    }
+                }
+            }
+        }
 
+        let mut endpoint = endpoint.expect("Failed to find available port after maximum attempts");
         endpoint.set_default_client_config(client_config);
 
         let addr = endpoint.local_addr().unwrap();
@@ -81,7 +105,7 @@ impl Network {
         network
     }
 
-    pub async fn connect(&self, addr: SocketAddr) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn connect(&self, addr: SocketAddr) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let conn = self.endpoint.connect(addr, "localhost")?.await?;
         println!("🔗 Connected to {}", addr);
 
@@ -259,11 +283,18 @@ impl Network {
                         }
                     }
                 }
-                Err(_) => {
-                    // 연결이 끊어진 경우
-                    println!("🔌 Connection closed: {}", addr);
-                    peers.write().await.remove(&addr);
-                    break;
+                Err(e) => {
+                    // 연결 상태 확인
+                    let error_msg = e.to_string();
+                    if error_msg.contains("Closed") || error_msg.contains("closed") {
+                        println!("🔌 Connection closed: {} ({})", addr, error_msg);
+                        peers.write().await.remove(&addr);
+                        break;
+                    } else {
+                        // 일시적인 에러는 로그만 출력하고 계속 시도
+                        println!("⚠️ Stream error from {}: {} (retrying...)", addr, error_msg);
+                        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                    }
                 }
             }
         }
@@ -278,7 +309,14 @@ impl Network {
         let priv_key = rustls::PrivateKey(key_der);
         let cert_chain = vec![rustls::Certificate(cert_der)];
 
-        ServerConfig::with_single_cert(cert_chain, priv_key).unwrap()
+        // Keep-alive 설정으로 연결 유지
+        let mut transport_config = quinn::TransportConfig::default();
+        transport_config.keep_alive_interval(Some(Duration::from_secs(5))); // 5초마다 keep-alive
+        transport_config.max_idle_timeout(Some(Duration::from_secs(30).try_into().unwrap())); // 30초 타임아웃
+        
+        let mut config = ServerConfig::with_single_cert(cert_chain, priv_key).unwrap();
+        config.transport_config(Arc::new(transport_config));
+        config
     }
 
     fn make_client_config() -> ClientConfig {
@@ -288,7 +326,14 @@ impl Network {
             .with_custom_certificate_verifier(SkipServerVerification::new())
             .with_no_client_auth();
 
-        ClientConfig::new(Arc::new(crypto))
+        // Keep-alive 설정으로 연결 유지
+        let mut transport_config = quinn::TransportConfig::default();
+        transport_config.keep_alive_interval(Some(Duration::from_secs(5))); // 5초마다 keep-alive
+        transport_config.max_idle_timeout(Some(Duration::from_secs(30).try_into().unwrap())); // 30초 타임아웃
+        
+        let mut config = ClientConfig::new(Arc::new(crypto));
+        config.transport_config(Arc::new(transport_config));
+        config
     }
 }
 

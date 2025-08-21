@@ -11,7 +11,8 @@
       "Bash(rm:*)",
       "Bash(cargo build:*)",
       "Bash(chmod:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(cargo:*)"
     ],
     "deny": [],
     "ask": [],
