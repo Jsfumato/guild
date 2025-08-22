@@ -3,7 +3,8 @@ resolver = "2"
 members = [ 
     "guild-discovery",
     "guild-home",
-    "guild-logger"
+    "guild-logger",
+    "minimal-blockchain"
 ]
 
 [workspace.dependencies]
