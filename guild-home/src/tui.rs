@@ -32,10 +32,11 @@ pub struct TuiApp {
     peers_info: Vec<(SocketAddr, PeerInfo)>,
     network_stats: NetworkStats,
     recent_logs: Vec<String>,
+    ipc_port: u16,
 }
 
 impl TuiApp {
-    pub fn new(network: Arc<Network>) -> Self {
+    pub fn new(network: Arc<Network>, ipc_port: u16) -> Self {
         Self {
             network,
             start_time: Instant::now(),
@@ -45,6 +46,7 @@ impl TuiApp {
             peers_info: Vec::new(),
             network_stats: NetworkStats::default(),
             recent_logs: Vec::new(),
+            ipc_port,
         }
     }
     
@@ -134,12 +136,22 @@ impl TuiApp {
 
         // 실제 네트워크 정보 (캐시된 데이터 사용)
         let port = self.network.local_port();
-        let header_text = format!(
-            " Port: {} │ Peers: {} │ Uptime: {} ",
-            port,
-            self.peer_count,
-            uptime_str
-        );
+        let header_text = if self.ipc_port > 0 {
+            format!(
+                " P2P: {} │ IPC: {} │ Peers: {} │ Uptime: {} ",
+                port,
+                self.ipc_port,
+                self.peer_count,
+                uptime_str
+            )
+        } else {
+            format!(
+                " P2P: {} │ Peers: {} │ Uptime: {} ",
+                port,
+                self.peer_count,
+                uptime_str
+            )
+        };
 
         let header = Paragraph::new(header_text)
             .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
@@ -314,7 +326,7 @@ impl TuiApp {
     }
 }
 
-pub async fn run_tui(network: Arc<Network>) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run_tui(network: Arc<Network>, ipc_port: u16) -> Result<(), Box<dyn std::error::Error>> {
     // 터미널 초기화
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -323,7 +335,7 @@ pub async fn run_tui(network: Arc<Network>) -> Result<(), Box<dyn std::error::Er
     let mut terminal = Terminal::new(backend)?;
 
     // TUI 앱 실행
-    let mut app = TuiApp::new(network);
+    let mut app = TuiApp::new(network, ipc_port);
     let res = app.run(&mut terminal).await;
 
     // 터미널 복원

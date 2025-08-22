@@ -1,5 +1,6 @@
 //! Guild Home - P2P 네트워킹 모듈
 
+pub mod blockchain_bridge;
 pub mod config;
 pub mod guild_home;
 pub mod help;

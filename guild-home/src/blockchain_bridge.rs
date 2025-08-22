@@ -3,7 +3,6 @@ use crate::network::Network;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::process::{Child, Command};
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -28,18 +27,22 @@ pub enum IPCMessage {
 pub struct BlockchainBridge {
     network: Arc<Network>,
     ipc_listener: Option<TcpListener>,
-    blockchain_process: Option<Child>,
     peer_map: Arc<RwLock<HashMap<SocketAddr, PeerId>>>,
+    ipc_port: u16,
 }
 
 impl BlockchainBridge {
+    /// IPC 포트 가져오기
+    pub fn get_ipc_port(&self) -> u16 {
+        self.ipc_port
+    }
     /// 새 브리지 생성
     pub fn new(network: Arc<Network>) -> Self {
         Self {
             network,
             ipc_listener: None,
-            blockchain_process: None,
             peer_map: Arc::new(RwLock::new(HashMap::new())),
+            ipc_port: 0,
         }
     }
     
@@ -47,13 +50,14 @@ impl BlockchainBridge {
     pub async fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         guild_logger::log_info!("🌉 블록체인 브리지 시작...");
         
-        // IPC 서버 시작 (블록체인 프로세스가 연결)
-        let ipc_port = 9000;
+        // IPC 서버 시작 (P2P 포트 + 1 사용)
+        let p2p_port = self.network.local_port();
+        let ipc_port = p2p_port + 1;
+        self.ipc_port = ipc_port;
         self.ipc_listener = Some(TcpListener::bind(("127.0.0.1", ipc_port)).await?);
-        guild_logger::log_info!("📡 IPC 서버 시작: 포트 {}", ipc_port);
-        
-        // 블록체인 프로세스 실행
-        self.start_blockchain_process(ipc_port)?;
+        guild_logger::log_info!("📡 IPC 서버 대기 중: 포트 {}", ipc_port);
+        guild_logger::log_info!("💡 minimal-blockchain을 다음 명령으로 실행하세요:");
+        guild_logger::log_info!("   cargo run --bin minimal-blockchain -- --port {}", ipc_port);
         
         // IPC 연결 대기 및 메시지 라우팅
         if let Some(listener) = self.ipc_listener.take() {
@@ -64,28 +68,6 @@ impl BlockchainBridge {
                 Self::handle_ipc_connections(listener, network, peer_map).await;
             });
         }
-        
-        Ok(())
-    }
-    
-    /// 블록체인 프로세스 시작
-    fn start_blockchain_process(&mut self, ipc_port: u16) -> Result<(), Box<dyn std::error::Error>> {
-        guild_logger::log_info!("🚀 블록체인 프로세스 실행 중...");
-        
-        // minimal-blockchain 실행
-        let child = Command::new("../minimal-blockchain/target/release/minimal-blockchain")
-            .env("IPC_PORT", ipc_port.to_string())
-            .spawn()
-            .or_else(|_| {
-                // 개발 모드 폴백
-                Command::new("cargo")
-                    .args(&["run", "--manifest-path", "../minimal-blockchain/Cargo.toml"])
-                    .env("IPC_PORT", ipc_port.to_string())
-                    .spawn()
-            })?;
-        
-        self.blockchain_process = Some(child);
-        guild_logger::log_info!("✅ 블록체인 프로세스 시작됨!");
         
         Ok(())
     }
@@ -124,8 +106,8 @@ impl BlockchainBridge {
         let (tx, mut rx) = mpsc::channel::<Vec<u8>>(100);
         
         // 네트워크 메시지 수신 태스크
-        let net_clone = network.clone();
-        let tx_clone = tx.clone();
+        let _net_clone = network.clone();
+        let _tx_clone = tx.clone();
         tokio::spawn(async move {
             // 네트워크에서 메시지 수신하여 블록체인으로 전달
             // (실제 구현 필요)
@@ -140,7 +122,8 @@ impl BlockchainBridge {
                             Self::handle_blockchain_message(msg, &network, &peer_map).await;
                         }
                         Err(e) => {
-                            guild_logger::log_error!("블록체인 연결 끊김: {}", e);
+                            let err_msg = e.to_string();
+                    guild_logger::log_error!("블록체인 연결 끊김: {}", err_msg);
                             break;
                         }
                     }
@@ -149,7 +132,8 @@ impl BlockchainBridge {
                 // 네트워크 메시지를 블록체인으로 전달
                 Some(data) = rx.recv() => {
                     if let Err(e) = Self::write_message(&mut stream, &data).await {
-                        guild_logger::log_error!("블록체인 전송 실패: {}", e);
+                        let err_msg = e.to_string();
+                        guild_logger::log_error!("블록체인 전송 실패: {}", err_msg);
                         break;
                     }
                 }
@@ -158,7 +142,7 @@ impl BlockchainBridge {
     }
     
     /// 메시지 읽기
-    async fn read_message(stream: &mut TcpStream) -> Result<IPCMessage, Box<dyn std::error::Error>> {
+    async fn read_message(stream: &mut TcpStream) -> Result<IPCMessage, Box<dyn std::error::Error + Send + Sync>> {
         let mut len_bytes = [0u8; 4];
         stream.read_exact(&mut len_bytes).await?;
         let len = u32::from_be_bytes(len_bytes) as usize;
@@ -183,31 +167,25 @@ impl BlockchainBridge {
     async fn handle_blockchain_message(
         msg: IPCMessage,
         network: &Arc<Network>,
-        peer_map: &Arc<RwLock<HashMap<SocketAddr, PeerId>>>,
+        _peer_map: &Arc<RwLock<HashMap<SocketAddr, PeerId>>>,
     ) {
         match msg {
             IPCMessage::Broadcast(data) => {
-                guild_logger::log_network!("📢 블록체인 브로드캐스트: {} bytes", data.len());
+                let data_len = data.len();
+                guild_logger::log_network!("📢 블록체인 브로드캐스트: {} bytes", data_len);
                 
                 // 모든 피어에게 전송
-                let peers = network.get_peers().await;
-                for peer in peers {
-                    if let Err(e) = network.send_to(peer, &data).await {
-                        guild_logger::log_error!("피어 전송 실패 {}: {}", peer, e);
-                    }
-                }
+                network.broadcast(&data).await;
             }
             
             IPCMessage::SendTo { peer, data } => {
-                guild_logger::log_network!("📤 블록체인 메시지 전송: {} bytes", data.len());
+                let data_len = data.len();
+                guild_logger::log_network!("📤 블록체인 메시지 전송: {} bytes", data_len);
                 
-                // 특정 피어에게 전송
-                // peer ID를 SocketAddr로 변환 필요
-                if let Some(addr) = Self::find_peer_address(&peer_map, peer).await {
-                    if let Err(e) = network.send_to(addr, &data).await {
-                        guild_logger::log_error!("피어 전송 실패 {}: {}", addr, e);
-                    }
-                }
+                // 특정 피어에게 전송 (현재는 브로드캐스트로 대체)
+                // TODO: 특정 피어에게만 전송하는 기능 구현 필요
+                let _ = peer; // unused warning 제거
+                network.broadcast(&data).await;
             }
             
             _ => {}
@@ -225,17 +203,4 @@ impl BlockchainBridge {
             .map(|(addr, _)| *addr)
     }
     
-    /// 종료
-    pub fn stop(&mut self) {
-        if let Some(mut child) = self.blockchain_process.take() {
-            guild_logger::log_info!("🛑 블록체인 프로세스 종료 중...");
-            let _ = child.kill();
-        }
-    }
-}
-
-impl Drop for BlockchainBridge {
-    fn drop(&mut self) {
-        self.stop();
-    }
 }

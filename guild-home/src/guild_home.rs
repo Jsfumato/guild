@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::blockchain_bridge::BlockchainBridge;
 use crate::config::Config;
 use crate::network::Network;
 use crate::log_network;
@@ -8,16 +9,36 @@ use guild_discovery::{Discovery, DiscoveryConfig};
 pub struct GuildHome {
     pub config: Config,
     pub network: Arc<Network>,
+    pub blockchain_bridge: Option<BlockchainBridge>,
 }
 
 impl GuildHome {
     pub async fn new(config: Config) -> Self {
         let network = Arc::new(Network::with_port(config.port).await);
+        let blockchain_bridge = Some(BlockchainBridge::new(network.clone()));
 
-        GuildHome { config, network }
+        GuildHome { 
+            config, 
+            network,
+            blockchain_bridge,
+        }
     }
 
-    pub async fn start(&self) {
+    pub async fn start(&mut self) {
+        // Start blockchain bridge
+        log_network!("Starting blockchain bridge...");
+        if let Some(ref mut bridge) = self.blockchain_bridge {
+            match bridge.start().await {
+                Ok(_) => log_network!("Blockchain bridge started successfully"),
+                Err(e) => {
+                    let err_msg = e.to_string();
+                    log_network!("Failed to start blockchain bridge: {}", err_msg);
+                }
+            }
+        } else {
+            log_network!("No blockchain bridge configured");
+        }
+        log_network!("Blockchain bridge initialization complete");
         // Discovery 설정
         let discovery_config = DiscoveryConfig {
             bootstrap_nodes: self.config.bootstrap.clone(),
@@ -83,20 +104,25 @@ impl GuildHome {
             }
         });
 
-        // 메인 모니터링 루프
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
-            self.config.heartbeat_interval,
-        ));
+        // 메인 모니터링 루프 (백그라운드에서 실행)
+        let network_monitor = self.network.clone();
+        let heartbeat_interval = self.config.heartbeat_interval;
+        let log_level = self.config.log_level.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
+                heartbeat_interval,
+            ));
 
-        loop {
-            interval.tick().await;
+            loop {
+                interval.tick().await;
 
-            let _peers = self.network.peer_count().await;
+                let _peers = network_monitor.peer_count().await;
 
-            // Log level check for future use
-            if self.config.log_level != "error" {
-                // Future monitoring output can go here
+                // Log level check for future use
+                if log_level != "error" {
+                    // Future monitoring output can go here
+                }
             }
-        }
+        });
     }
 }
